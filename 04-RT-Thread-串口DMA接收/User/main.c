@@ -23,7 +23,6 @@
 #include "board.h"
 #include "rtthread.h"
 
-extern char RX_BUFF[USART_RBUFF_SIZE];
 /*
 *************************************************************************
 *                               变量
@@ -66,6 +65,7 @@ int main(void)
 	 * 即在component.c文件中的rtthread_startup()函数中完成了。
 	 * 所以在main函数中，只需要创建线程和启动线程即可。
 	 */
+	
 	rt_kprintf("这是一个[野火]-STM32F407-骄阳-RTT串口DMA接收实验！\n");
   rt_kprintf("串口发送数据触发中断,任务处理数据!\n");
 
@@ -80,7 +80,7 @@ int main(void)
     rt_thread_create( "usart",              /* 线程名字 */
                       usart_thread_entry,   /* 线程入口函数 */
                       RT_NULL,             /* 线程入口函数参数 */
-                      512,                 /* 线程栈大小 */
+                      1024,                 /* 线程栈大小 */
                       2,                   /* 线程的优先级 */
                       20);                 /* 线程时间片 */
                    
@@ -100,6 +100,8 @@ int main(void)
 static void usart_thread_entry(void* parameter)
 {
   rt_err_t uwRet = RT_EOK;	
+
+	__HAL_UART_ENABLE_IT(&UartHandle,UART_IT_IDLE);
     /* 任务都是一个无限循环，不能返回 */
   while (1)
   {
@@ -107,7 +109,7 @@ static void usart_thread_entry(void* parameter)
                         RT_WAITING_FOREVER); 	  /* 等待时间*/
     if(RT_EOK == uwRet)
     {
-      rt_kprintf("收到数据:%s\n",RX_BUFF);
+      rt_kprintf("收到数据:%s\n",Usart_Rx_Buf);
     }
   }
 }

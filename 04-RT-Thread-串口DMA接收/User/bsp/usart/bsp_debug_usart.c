@@ -1,176 +1,84 @@
 /**
   ******************************************************************************
-  * @file    bsp_debug_usart.c
+  * @file    bsp_usart_dma.c
   * @author  fire
   * @version V1.0
-  * @date    2016-xx-xx
-  * @brief   使用串口1，重定向c库printf函数到usart端口，中断接收模式
+  * @date    2015-xx-xx
+  * @brief   重现c库printf函数到usart端口,使用DMA模式发送数据
   ******************************************************************************
   * @attention
   *
-  * 实验平台:野火  STM32 H743 开发板  
+  * 实验平台:野火  STM32 F407 开发板  
   * 论坛    :http://www.firebbs.cn
-  * 淘宝    :http://firestm32.taobao.com
+  * 淘宝    :https://fire-stm32.taobao.com
   *
   ******************************************************************************
   */ 
+  
 #include "./usart/bsp_debug_usart.h"
 /* RT-Thread相关头文件 */
 #include <rthw.h>
 #include <rtthread.h>
 
+DMA_HandleTypeDef  DMA_Handle;      //DMA句柄
+UART_HandleTypeDef UartHandle;      //UART句柄
 
-UART_HandleTypeDef UartHandle;
-DMA_HandleTypeDef DMA_Handle;
+uint8_t Usart_Rx_Buf[USART_RBUFF_SIZE];
 
-//__attribute__ ((at(0x30000000))) 
-uint8_t RX_BUFF[USART_RBUFF_SIZE]={0};
  /**
-  * @brief  DEBUG_USART GPIO 配置,工作模式配置。115200 8-N-1
+  * @brief  USART 中断配置
   * @param  无
   * @retval 无
-  */  
-void DEBUG_USART_Config(void)
+  */
+void USART_NVIC_Config(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct;
-
-    RCC_PeriphCLKInitTypeDef RCC_PeriphClkInit;
-        
-    DEBUG_USART_RX_GPIO_CLK_ENABLE();
-    DEBUG_USART_TX_GPIO_CLK_ENABLE();
-    
-    /* 配置串口1时钟源*/
-		RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
-		RCC_PeriphClkInit.Usart16ClockSelection = RCC_USART16CLKSOURCE_D2PCLK2;
-		HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphClkInit);
-    /* 使能串口1时钟 */
-    DEBUG_USART_CLK_ENABLE();
-
-    /* 配置Tx引脚为复用功能  */
-    GPIO_InitStruct.Pin = DEBUG_USART_TX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = DEBUG_USART_TX_AF;
-    HAL_GPIO_Init(DEBUG_USART_TX_GPIO_PORT, &GPIO_InitStruct);
-    
-    /* 配置Rx引脚为复用功能 */
-    GPIO_InitStruct.Pin = DEBUG_USART_RX_PIN;
-    GPIO_InitStruct.Alternate = DEBUG_USART_RX_AF;
-    HAL_GPIO_Init(DEBUG_USART_RX_GPIO_PORT, &GPIO_InitStruct); 
-    
-    /* 配置串DEBUG_USART 模式 */
-    UartHandle.Instance = DEBUG_USART;
-    UartHandle.Init.BaudRate = 115200;
-    UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
-    UartHandle.Init.StopBits = UART_STOPBITS_1;
-    UartHandle.Init.Parity = UART_PARITY_NONE;
-    UartHandle.Init.Mode = UART_MODE_TX_RX;
-    UartHandle.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
-    UartHandle.Init.OneBitSampling = UART_ONEBIT_SAMPLING_DISABLED;
-    UartHandle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    HAL_UART_Init(&UartHandle);
-
-    /*串口1中断初始化 */
-    HAL_NVIC_SetPriority(DEBUG_USART_IRQ, 6, 0);
-    HAL_NVIC_EnableIRQ(DEBUG_USART_IRQ);
-		
-}
-
-void USART_DMA_Config(void)
-{
-  /*开启DMA时钟*/
-  DEBUG_USART_DMA_CLK_ENABLE();
-
-  DMA_Handle.Instance = DEBUG_USART_DMA_STREAM;
-  /*usart1 tx对应dma2，通道4，数据流7*/	
-  DMA_Handle.Init.Request = DMA_REQUEST_USART1_RX; 
-  /*方向：从内存到外设*/		
-  DMA_Handle.Init.Direction= DMA_PERIPH_TO_MEMORY;	
-  /*外设地址不增*/	    
-  DMA_Handle.Init.PeriphInc = DMA_PINC_DISABLE; 
-  /*内存地址自增*/
-  DMA_Handle.Init.MemInc = DMA_MINC_ENABLE;	
-  /*外设数据单位*/	
-  DMA_Handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-  /*内存数据单位 8bit*/
-  DMA_Handle.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;	
-  /*DMA模式：不断循环*/
-  DMA_Handle.Init.Mode = DMA_CIRCULAR;	 
-  /*优先级：中*/	
-  DMA_Handle.Init.Priority = DMA_PRIORITY_MEDIUM;      
-  /*禁用FIFO*/
-  DMA_Handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;        
-  DMA_Handle.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;    
-  /*存储器突发传输 1个节拍*/
-  DMA_Handle.Init.MemBurst = DMA_MBURST_SINGLE;    
-  /*外设突发传输 1个节拍*/
-  DMA_Handle.Init.PeriphBurst = DMA_PBURST_SINGLE;    
-  /*配置DMA2的数据流7*/		   
-//  /* Deinitialize the stream for new transfer */
-  HAL_DMA_DeInit(&DMA_Handle);
-  /* Configure the DMA stream */
-  HAL_DMA_Init(&DMA_Handle); 
-  
-//	__HAL_DMA_ENABLE(&UartHandle);  
+	HAL_NVIC_SetPriority(DMA2_Stream5_IRQn,7,0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
 	
-   /* Associate the DMA handle */
-  __HAL_LINKDMA(&UartHandle, hdmarx, DMA_Handle);
-	
-	HAL_UART_Receive_DMA(&UartHandle, RX_BUFF, USART_RBUFF_SIZE);
-  
-	/*配置串口接收中断，在串口初始化调用的话会进入一次中断导致错误，在外部使能即可 */
-	__HAL_UART_CLEAR_IT(&UartHandle, UART_CLEAR_IDLEF);
-	__HAL_UART_ENABLE_IT(&UartHandle,UART_IT_IDLE);  
-  
+	HAL_NVIC_SetPriority(USART1_IRQn,8,0);
+	HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
-/* 外部定义信号量控制块 */
-extern rt_sem_t test_sem;
-
-void Uart_DMA_Rx_Data(void)
+ /**
+  * @brief  USART GPIO 配置,工作模式配置。115200 8-N-1
+  * @param  无
+  * @retval 无
+  */
+void Debug_USART_Config(void)
 {
- 
+	__IO uint32_t reg = 0;
+  GPIO_InitTypeDef GPIO_InitStruct;
+      
+  DEBUG_USART_RX_GPIO_CLK_ENABLE();
+  DEBUG_USART_TX_GPIO_CLK_ENABLE();
+  /* 使能 UART 时钟 */
+  DEBUG_USART_CLK_ENABLE();
   
-  // 关闭DMA ，防止干扰
-  __HAL_DMA_DISABLE(&DMA_Handle);      
-  // 清DMA标志位
-  __HAL_DMA_CLEAR_FLAG(&DMA_Handle,DMA_FLAG_TCIF3_7);     
-
-  //  重新赋值计数值，必须大于等于最大可能接收到的数据帧数目   
-  WRITE_REG(((DMA_Stream_TypeDef   *)DMA_Handle.Instance)->NDTR , USART_RBUFF_SIZE);
-
-  __HAL_DMA_ENABLE(&DMA_Handle);  
-
-  //给出二值信号量 ，发送接收到新数据标志，供前台程序查询
-		rt_sem_release(test_sem);  
-
-	
-}
-
-void HAL_UART_AbortReceiveCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart == &UartHandle)
-	{
-		//给出二值信号量 ，发送接收到新数据标志，供前台程序查询
-		rt_sem_release(test_sem);  
-		//重新开始DMA接收
-		HAL_UART_Receive_DMA(&UartHandle,RX_BUFF,USART_RBUFF_SIZE);
-	}
-}
-
-/*****************  发送字符串 **********************/
-void Usart_SendString(uint8_t *str)
-{
-	unsigned int k=0;
-  do 
-  {
-      HAL_UART_Transmit( &UartHandle,(uint8_t *)(str + k) ,1,1000);
-      k++;
-  } while(*(str + k)!='\0');
+   /* 配置Tx引脚为复用功能  */
+  GPIO_InitStruct.Pin = DEBUG_USART_TX_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = DEBUG_USART_TX_AF;
+  HAL_GPIO_Init(DEBUG_USART_TX_GPIO_PORT, &GPIO_InitStruct);
   
+  /* 配置Rx引脚为复用功能 */
+  GPIO_InitStruct.Pin = DEBUG_USART_RX_PIN;
+  GPIO_InitStruct.Alternate = DEBUG_USART_RX_AF;
+  HAL_GPIO_Init(DEBUG_USART_RX_GPIO_PORT, &GPIO_InitStruct);
+  
+  
+  UartHandle.Instance          = DEBUG_USART;
+  UartHandle.Init.BaudRate     = DEBUG_USART_BAUDRATE;
+  UartHandle.Init.WordLength   = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits     = UART_STOPBITS_1;
+  UartHandle.Init.Parity       = UART_PARITY_NONE;
+  UartHandle.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode         = UART_MODE_TX_RX;
+  
+  HAL_UART_Init(&UartHandle); 
 }
+
 ///重定向c库函数printf到串口DEBUG_USART，重定向后可使用printf函数
 int fputc(int ch, FILE *f)
 {
@@ -189,10 +97,58 @@ int fgetc(FILE *f)
 	return (ch);
 }
 
-
-void UART_IdelCallback(void)
+/**
+  * @brief  USART1 TX DMA 配置，外设到内存(USART1->DR)
+  * @param  无
+  * @retval 无
+  */
+void USART_DMA_Config(void)
 {
-  Uart_DMA_Rx_Data();       /* 释放一个信号量，表示数据已接收 */
+  DEBUG_USART_DMA_CLK_ENABLE();  
+   
+  //Tx DMA配置
+  DMA_Handle.Instance=DEBUG_USART_DMA_STREAM;                            //数据流选择
+  DMA_Handle.Init.Request=DMA_REQUEST_USART1_RX;                                //通道选择
+  DMA_Handle.Init.Direction=DMA_PERIPH_TO_MEMORY;             //外设到存储器
+  DMA_Handle.Init.PeriphInc=DMA_PINC_DISABLE;                 //外设非增量模式
+  DMA_Handle.Init.MemInc=DMA_MINC_ENABLE;                     //存储器增量模式
+  DMA_Handle.Init.PeriphDataAlignment=DMA_PDATAALIGN_BYTE;    //外设数据长度:8位
+  DMA_Handle.Init.MemDataAlignment=DMA_MDATAALIGN_BYTE;       //存储器数据长度:8位
+  DMA_Handle.Init.Mode=DMA_CIRCULAR;                            //外设普通模式
+  DMA_Handle.Init.Priority=DMA_PRIORITY_MEDIUM;               //中等优先级
+  DMA_Handle.Init.FIFOMode=DMA_FIFOMODE_DISABLE;              //禁用FIFO
+  DMA_Handle.Init.FIFOThreshold=DMA_FIFO_THRESHOLD_FULL;      
+  DMA_Handle.Init.MemBurst=DMA_MBURST_SINGLE;                 //存储器突发单次传输
+  DMA_Handle.Init.PeriphBurst=DMA_PBURST_SINGLE;              //外设突发单次传输
+//	DMA_Handle.XferCpltCallback = callback;
+  HAL_DMA_Init(&DMA_Handle);
+  /* Associate the DMA handle */
+  __HAL_LINKDMA(&UartHandle, hdmarx, DMA_Handle); 
+	__HAL_DMA_ENABLE_IT(UartHandle.hdmarx, DMA_IT_TC | DMA_IT_HT | DMA_IT_TE);//关闭DMA 错误 传输一半 全部完成 中断
+	HAL_UART_Receive_DMA(&UartHandle,Usart_Rx_Buf,USART_RBUFF_SIZE);
+
 }
+
+void USART_Init(void)
+{
+	Debug_USART_Config();
+	USART_DMA_Config();
+	USART_NVIC_Config();
+}
+
+/* 外部定义信号量控制块 */
+extern rt_sem_t test_sem;
+
+void HAL_UART_AbortReceiveCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart == &UartHandle)
+	{
+		//给出二值信号量 ，发送接收到新数据标志，供前台程序查询
+		rt_sem_release(test_sem);  
+		//重新开始DMA接收
+		HAL_UART_Receive_DMA(&UartHandle,Usart_Rx_Buf,USART_RBUFF_SIZE);
+	}
+}
+
 
 /*********************************************END OF FILE**********************/

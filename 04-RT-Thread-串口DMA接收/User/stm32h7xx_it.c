@@ -221,18 +221,19 @@ void DEBUG_USART_IRQHandler(void)
   /* 进入中断 */
   rt_interrupt_enter();
 
-  if(__HAL_UART_GET_FLAG(&UartHandle,UART_FLAG_IDLE)!=RESET)
-  {
-			UART_IdelCallback();
-      __HAL_UART_CLEAR_IT(&UartHandle, UART_CLEAR_IDLEF);
-  }
-  
+	if(__HAL_UART_GET_FLAG(&UartHandle,UART_FLAG_IDLE)!=RESET)
+	{
+		//空闲中断产生，说明接收完成，停止串口接收，此函数会停止DMA的接收，并调用HAL_UART_AbortReceiveCpltCallback
+		HAL_UART_AbortReceive_IT(&UartHandle);
+		//清除空闲中断标志位
+		__HAL_UART_CLEAR_IDLEFLAG(&UartHandle);
+	}
+	
   /* 离开中断 */
   rt_interrupt_leave();
 }
 
-
-void DMA2_Stream7_IRQHandler(void)
+void DMA2_Stream5_IRQHandler(void)
 {
   HAL_DMA_IRQHandler(UartHandle.hdmarx);
 }

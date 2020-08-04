@@ -65,7 +65,7 @@ static void ADC_Mode_Config(void)
     //选择DMA1的Stream1
     hdma_adc.Instance = RHEOSTAT_ADC_DMA_Base;
     //ADC1的DMA请求
-    hdma_adc.Init.Request = RHEOSTAT_ADC_DMA_Request;
+    hdma_adc.Init.Request = DMA_REQUEST_TIM1_CH1;
     //传输方向：外设-》内存
     hdma_adc.Init.Direction = DMA_PERIPH_TO_MEMORY;
     //外设地址不自增

@@ -44,11 +44,11 @@ void rt_hw_board_init()
 	LED_GPIO_Config();	
 	
 	/* KEY 端口初始化 */
-  EXTI_Key_Config();
+  //EXTI_Key_Config();
 	
 	/* usart 端口初始化 */
-  DEBUG_USART_Config();
-	USART_DMA_Config();
+  USART_Init();
+	
 
 
 	
@@ -177,7 +177,6 @@ static void SystemClock_Config(void)
   ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
   if(ret != HAL_OK)
   {
-
     while(1) { ; }
   }
   
@@ -201,5 +200,4 @@ static void SystemClock_Config(void)
     while(1) { ; }
   }
 }
-
 /****************************END OF FILE***************************/

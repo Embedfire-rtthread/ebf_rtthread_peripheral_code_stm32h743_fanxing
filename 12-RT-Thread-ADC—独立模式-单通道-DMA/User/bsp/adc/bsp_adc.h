@@ -16,7 +16,7 @@
 //DMA时钟使能
 #define RHEOSTAT_ADC_DMA_CLK_ENABLE()               __HAL_RCC_DMA1_CLK_ENABLE();
 #define RHEOSTAT_ADC_DMA_Base                       DMA1_Stream1
-#define RHEOSTAT_ADC_DMA_Request                    DMA_REQUEST_ADC3
+#define RHEOSTAT_ADC_DMA_Request                    DMA_REQUEST_TIM1_CH1
 //DMA中断服务函数
 #define RHEOSTAT_ADC_DMA_IRQHandler                 DMA1_Stream1_IRQHandler
 
