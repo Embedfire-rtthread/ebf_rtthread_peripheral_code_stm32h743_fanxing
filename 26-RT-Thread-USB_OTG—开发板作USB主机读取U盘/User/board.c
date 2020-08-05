@@ -141,6 +141,10 @@ void rt_hw_console_output(const char *str)
   * @param  None
   * @retval None
   */
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
